@@ -1,26 +1,29 @@
-TARGET = App_MicTest
+TARGET = AI_Tamagotchi
 
-DEVICE ?= PC
-RES_PATH ?= "./res"
-
-ifeq ($(DEVICE),PC)
+CC = aarch64-linux-gnu-g++
+ifeq ($(shell uname -m), x86_64)
 	CC = g++
-	SDL2_CONFIG = sdl2-config
-else
-	CC = $(CXX)
-	SDL2_CONFIG = /usr/bin/sdl2-config
 endif
 
-COMPILER_FLAGS = $(shell $(SDL2_CONFIG) --cflags) -O2 -Wall -DRES_PATH=\"$(RES_PATH)\"
-LINKER_FLAGS   = $(shell $(SDL2_CONFIG) --libs) -pthread
+CFLAGS = -Wall -O3 -Iinclude -Isrc -std=c++11
+LDFLAGS = -lSDL2 -lcurl -pthread -lm
+
+SRC_DIR = src
+OBJ_DIR = obj
+
+SRCS = $(wildcard $(SRC_DIR)/*.cpp)
+OBJS = $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SRCS))
 
 all: $(TARGET)
 
-$(TARGET): src/MicTest.o
-	$(CC) $< -o $@ $(LINKER_FLAGS)
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-src/%.o: src/%.cpp
-	$(CC) -c $< -o $@ $(COMPILER_FLAGS)
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp | $(OBJ_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJ_DIR):
+	mkdir -p $@
 
 clean:
-	rm -f src/*.o $(TARGET)
+	rm -rf $(OBJ_DIR) $(TARGET)

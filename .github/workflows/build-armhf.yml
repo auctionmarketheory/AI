@@ -1,4 +1,4 @@
-name: Build App_MicTest ARMHF (R36S A33)
+name: Build AI_Tamagotchi ARMHF (R36S A33)
 
 on: [push, pull_request, workflow_dispatch]
 
@@ -22,14 +22,14 @@ jobs:
           run: |
             export DEBIAN_FRONTEND=noninteractive
             apt-get update
-            apt-get install -y build-essential libsdl2-dev
-            make DEVICE=RG351V CXX=g++ CC=g++ SDL2_CONFIG=sdl2-config
-
+            apt-get install -y build-essential libsdl2-dev libcurl4-openssl-dev
+            make
+            
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: App_MicTest_Package
+          name: App_Tamagotchi_Package
           path: |
-            App_MicTest
+            AI_Tamagotchi
             res/
-            launchers/MicTest.sh
+            launchers/AI_Tamagotchi.sh
