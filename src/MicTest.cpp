@@ -27,7 +27,7 @@
 #define MS_PER_FRAME     33
 
 #define REC_DURATION_SEC    5
-#define SAMPLE_RATE         48000
+#define SAMPLE_RATE         44100
 #define CHANNELS            1      // Mono mic
 #define AUDIO_BUFFER_FRAMES 1024   // Safe zone: well under 2048 frame limit
 #define OUTPUT_WAV_PATH     "/storage/roms/ports/App_MicTest/test_mic.wav"
@@ -178,17 +178,36 @@ bool openMicDevice() {
 
     int num_devs = SDL_GetNumAudioDevices(1); // 1 = capture devices
     const char* dev_name = NULL;
+    char dev_list[512] = {0};
     if (num_devs > 0) {
         dev_name = SDL_GetAudioDeviceName(0, 1);
-        char buf[128];
-        snprintf(buf, sizeof(buf), "Opened DEV: %s", dev_name ? dev_name : "NULL");
-        g_status_msg = buf;
-    } else {
-        g_status_msg = "WARNING: No capture devices reported by SDL!";
+        for(int i=0; i<num_devs && i<4; i++) {
+            strcat(dev_list, SDL_GetAudioDeviceName(i, 1));
+            strcat(dev_list, " | ");
+        }
     }
 
-    // iscapture = 1 means we want to record
-    g_audio_dev = SDL_OpenAudioDevice(dev_name, 1, &want, &got, 0);
+    // Try forcing hw:0,0 to bypass broken ALSA plugins (dmix/plug)
+    g_audio_dev = SDL_OpenAudioDevice("hw:0,0", 1, &want, &got, 0);
+    
+    // If hw:0,0 fails, fallback to SDL's default device
+    if (g_audio_dev == 0) {
+        g_audio_dev = SDL_OpenAudioDevice(dev_name, 1, &want, &got, 0);
+    }
+
+    // Write debug info to a file
+    char buf[256];
+    snprintf(buf, sizeof(buf), "Req: hw:0,0\nFallback: %s\nAvail: %s\nGot Format: %d, Freq: %d\nDevice ID: %d", 
+             dev_name ? dev_name : "NULL", dev_list, got.format, got.freq, g_audio_dev);
+    system((std::string("echo '") + buf + "' > /tmp/mictest_debug.txt").c_str());
+
+    if (g_audio_dev > 0) {
+        snprintf(buf, sizeof(buf), "Opened DEV ID: %d (Check /tmp/mictest_debug.txt)", g_audio_dev);
+        g_status_msg = buf;
+    } else {
+        g_status_msg = "WARNING: Failed to open any capture device!";
+    }
+
     return (g_audio_dev > 0);
 }
 
