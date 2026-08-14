@@ -30,7 +30,7 @@
 #define SAMPLE_RATE         48000
 #define CHANNELS            1      // Mono mic
 #define AUDIO_BUFFER_FRAMES 1024   // Safe zone: well under 2048 frame limit
-#define OUTPUT_WAV_PATH     "/tmp/test_mic.wav"
+#define OUTPUT_WAV_PATH     "/storage/roms/ports/App_MicTest/test_mic.wav"
 
 // ===== STATES =====
 enum AppState {
@@ -288,11 +288,19 @@ int main(int argc, char* argv[]) {
                 int b = ev.jbutton.button;
                 if (b == 0) press_a = true;
                 if (b == 1) press_b = true;
-                if (b == 2) press_x = true;
+                if (b == 2 || b == 3) press_x = true;
+                if (b == 6 || b == 13) press_up = true;      // L2 or DPad Up
+                if (b == 7 || b == 14) press_down = true;    // R2 or DPad Down
             }
             if (ev.type == SDL_JOYHATMOTION) {
-                if (ev.jhat.value & SDL_HAT_UP)   press_up   = true;
+                if (ev.jhat.value & SDL_HAT_UP)    press_up   = true;
                 if (ev.jhat.value & SDL_HAT_DOWN)  press_down = true;
+            }
+            if (ev.type == SDL_JOYAXISMOTION) {
+                if (ev.jaxis.axis == 1) { // Left Analog Y axis
+                    if (ev.jaxis.value < -16000) press_up = true;
+                    if (ev.jaxis.value > 16000)  press_down = true;
+                }
             }
             if (ev.type == SDL_KEYDOWN) {
                 if (ev.key.keysym.sym == SDLK_a || ev.key.keysym.sym == SDLK_RETURN) press_a = true;
