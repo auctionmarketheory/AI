@@ -71,12 +71,26 @@ void enableMic() {
     system("amixer cset name='Audio phone headsetmic' on 2>/dev/null");
     system("amixer cset name='Audio phone voicerecord' on 2>/dev/null");
     system("amixer cset name='Audio phone mic' on 2>/dev/null");
+    system("amixer cset name='Audio phone in' on 2>/dev/null");
+    system("amixer cset name='Audio phone in left' on 2>/dev/null");
+    system("amixer cset name='Audio linein in' on 2>/dev/null");
+    
+    // Maximize all pre-amp gains
     system("amixer cset name='MIC1 boost AMP gain control' 7 2>/dev/null");
+    system("amixer cset name='MIC2 boost AMP gain control' 7 2>/dev/null");
     system("amixer cset name='ADC input gain ctrl' 7 2>/dev/null");
+    
+    // Enable ADC input paths
     system("amixer cset name='Audio adc phonein' on 2>/dev/null");
     system("amixer cset name='Audio linein record' on 2>/dev/null");
+    
+    // Connect all pre-amps to the ADC mixer
     system("amixer cset name='MIC1_G boost stage output mixer control' 7 2>/dev/null");
     system("amixer cset name='MIC2_G boost stage output mixer control' 7 2>/dev/null");
+    system("amixer cset name='LINEIN_G boost stage output mixer control' 7 2>/dev/null");
+    system("amixer cset name='PHONE_G boost stage output mixer control' 7 2>/dev/null");
+    system("amixer cset name='PHONE_NG boost stage output mixer control' 7 2>/dev/null");
+    system("amixer cset name='PHONE_PG boost stage output mixer control' 7 2>/dev/null");
 }
 
 void disableMic() {
