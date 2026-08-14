@@ -73,7 +73,10 @@ void enableMic() {
     system("amixer cset name='Audio phone mic' on 2>/dev/null");
     system("amixer cset name='MIC1 boost AMP gain control' 7 2>/dev/null");
     system("amixer cset name='ADC input gain ctrl' 7 2>/dev/null");
+    system("amixer cset name='Audio adc phonein' on 2>/dev/null");
     system("amixer cset name='Audio linein record' on 2>/dev/null");
+    system("amixer cset name='MIC1_G boost stage output mixer control' 7 2>/dev/null");
+    system("amixer cset name='MIC2_G boost stage output mixer control' 7 2>/dev/null");
 }
 
 void disableMic() {
@@ -173,8 +176,19 @@ bool openMicDevice() {
     want.callback = audioCallback;
     want.userdata = NULL;
 
+    int num_devs = SDL_GetNumAudioDevices(1); // 1 = capture devices
+    const char* dev_name = NULL;
+    if (num_devs > 0) {
+        dev_name = SDL_GetAudioDeviceName(0, 1);
+        char buf[128];
+        snprintf(buf, sizeof(buf), "Opened DEV: %s", dev_name ? dev_name : "NULL");
+        g_status_msg = buf;
+    } else {
+        g_status_msg = "WARNING: No capture devices reported by SDL!";
+    }
+
     // iscapture = 1 means we want to record
-    g_audio_dev = SDL_OpenAudioDevice(NULL, 1, &want, &got, 0);
+    g_audio_dev = SDL_OpenAudioDevice(dev_name, 1, &want, &got, 0);
     return (g_audio_dev > 0);
 }
 
