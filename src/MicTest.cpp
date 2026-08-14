@@ -348,7 +348,8 @@ int main(int argc, char* argv[]) {
                         memset(g_waveform, 0, sizeof(g_waveform));
 
                         // Apply Golden Fix first to reset DMA, THEN open audio
-                        goldenFix();
+                        // Disable goldenFix during capture, as it might turn off the ADC!
+                        // goldenFix();
                         SDL_Delay(200);
                         enableMic();
                         SDL_Delay(100);
