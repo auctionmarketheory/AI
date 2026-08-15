@@ -21,8 +21,13 @@ void UiRenderer::setExpression(FaceExpression expr) {
     blinkTimer = 0.0f;
 }
 
-void UiRenderer::setChatMessage(const std::string& msg) {
-    currentMessage = msg;
+void UiRenderer::setUserMessage(const std::string& msg, bool cursor) {
+    userMessage = msg;
+    showCursor = cursor;
+}
+
+void UiRenderer::setAiMessage(const std::string& msg) {
+    aiMessage = msg;
     charactersToShow = 0;
     typewriterTimer = 0.0f;
 }
@@ -42,17 +47,20 @@ void UiRenderer::update(float deltaTime) {
         }
     }
 
-    // Logic gõ phím (Typewriter)
-    if (charactersToShow < currentMessage.length()) {
+    // Nháy con trỏ
+    cursorTimer += deltaTime;
+    if (cursorTimer > 1.0f) cursorTimer = 0.0f;
+
+    // Logic gõ phím (Typewriter) cho AI
+    if (charactersToShow < aiMessage.length()) {
         typewriterTimer += deltaTime;
         if (typewriterTimer > 0.02f) { // Tốc độ gõ 0.02s / ký tự
             charactersToShow++;
             typewriterTimer = 0.0f;
             
             // Fix utf8 split (không cắt ngang ký tự utf-8)
-            // Kỹ thuật đơn giản: Cứ duyệt xem nếu gặp bit 10xxxxxx thì hiển thị thêm 1 byte nữa
-            while (charactersToShow < currentMessage.length() && 
-                  (currentMessage[charactersToShow] & 0xC0) == 0x80) {
+            while (charactersToShow < aiMessage.length() && 
+                  (aiMessage[charactersToShow] & 0xC0) == 0x80) {
                 charactersToShow++;
             }
         }
@@ -115,40 +123,20 @@ void UiRenderer::drawFace(int cx, int cy) {
     fillRect(cx - mouthWidth/2, mouthY, mouthWidth, mouthHeight, eyeColor);
 }
 
-void UiRenderer::drawTextBox(int screenWidth, int screenHeight) {
-    int boxX = 20;
-    int boxY = screenHeight - 140;
-    int boxW = screenWidth - 40;
-    int boxH = 120;
-
-    // Khung viền Neon
-    fillRect(boxX, boxY, boxW, boxH, COLOR_DIM);
-    drawRect(boxX, boxY, boxW, boxH, COLOR_CYAN);
-    drawRect(boxX-1, boxY-1, boxW+2, boxH+2, COLOR_PINK);
-
-    // Lấy chuỗi theo số ký tự typewriter
-    std::string textToDraw = currentMessage.substr(0, charactersToShow);
-    
-    // Thuật toán bọc dòng (Word Wrap) thủ công để không tràn khỏi màn hình
-    int textX = boxX + 15;
-    int textY = boxY + 15;
-    int maxWidth = boxW - 30;
-    int lineHeight = font->sz + 10;
-
+void drawWrappedText(SDL_Renderer* renderer, CustomFont* font, std::string text, int x, int y, int maxW, RGBA color) {
     std::string currentLine = "";
+    int textX = x;
+    int textY = y;
+    int lineHeight = font->sz + 10;
     size_t i = 0;
-    while (i < textToDraw.length()) {
-        // Tìm từ tiếp theo
-        size_t nextSpace = textToDraw.find(' ', i);
-        if (nextSpace == std::string::npos) nextSpace = textToDraw.length();
+    while (i < text.length()) {
+        size_t nextSpace = text.find(' ', i);
+        if (nextSpace == std::string::npos) nextSpace = text.length();
         
-        std::string word = textToDraw.substr(i, nextSpace - i + 1); // +1 để bao gồm cả khoảng trắng
-        
-        // Kiểm tra chiều dài dòng hiện tại + từ mới
+        std::string word = text.substr(i, nextSpace - i + 1);
         int lineWidth = font->getTextWidth(renderer, currentLine + word);
-        if (lineWidth > maxWidth && currentLine.length() > 0) {
-            // Dòng đã đầy, vẽ dòng hiện tại và xuống dòng
-            font->draw(renderer, textX, textY, currentLine, COLOR_WHITE);
+        if (lineWidth > maxW && currentLine.length() > 0) {
+            font->draw(renderer, textX, textY, currentLine, color);
             textY += lineHeight;
             currentLine = word;
         } else {
@@ -156,19 +144,43 @@ void UiRenderer::drawTextBox(int screenWidth, int screenHeight) {
         }
         i = nextSpace + 1;
     }
-    // Vẽ dòng cuối
     if (currentLine.length() > 0) {
-        font->draw(renderer, textX, textY, currentLine, COLOR_WHITE);
+        font->draw(renderer, textX, textY, currentLine, color);
     }
+}
+
+void UiRenderer::drawTextBoxes(int screenWidth, int screenHeight) {
+    int boxX = 20;
+    int boxW = screenWidth - 40;
+    
+    // Khung 1: YOU (User Input)
+    int uBoxH = 60;
+    int uBoxY = screenHeight - 200; // Nâng lên cao hơn
+    fillRect(boxX, uBoxY, boxW, uBoxH, COLOR_DIM);
+    drawRect(boxX, uBoxY, boxW, uBoxH, COLOR_CYAN);
+    
+    std::string displayUserStr = "YOU: " + userMessage;
+    if (showCursor && cursorTimer < 0.5f) displayUserStr += "_";
+    drawWrappedText(renderer, font, displayUserStr, boxX + 15, uBoxY + 15, boxW - 30, COLOR_CYAN);
+
+    // Khung 2: AMT ASSIST (AI Response)
+    int aBoxH = 110;
+    int aBoxY = screenHeight - 130;
+    fillRect(boxX, aBoxY, boxW, aBoxH, COLOR_DIM);
+    drawRect(boxX, aBoxY, boxW, aBoxH, COLOR_PINK);
+    drawRect(boxX-1, aBoxY-1, boxW+2, aBoxH+2, COLOR_PINK);
+
+    std::string textToDraw = "AMT: " + aiMessage.substr(0, charactersToShow);
+    drawWrappedText(renderer, font, textToDraw, boxX + 15, aBoxY + 15, boxW - 30, COLOR_WHITE);
 }
 
 void UiRenderer::render(int screenWidth, int screenHeight) {
     // Vẽ background
     fillRect(0, 0, screenWidth, screenHeight, COLOR_BG);
 
-    // Vẽ Face ở giữa phía trên
-    drawFace(screenWidth / 2, screenHeight / 2 - 60);
+    // Vẽ Face ở giữa phía trên (nâng cao lên một chút)
+    drawFace(screenWidth / 2, screenHeight / 2 - 90);
 
-    // Vẽ Khung Chat
-    drawTextBox(screenWidth, screenHeight);
+    // Vẽ 2 Khung Chat
+    drawTextBoxes(screenWidth, screenHeight);
 }

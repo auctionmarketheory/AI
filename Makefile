@@ -1,4 +1,4 @@
-TARGET = AI_Tamagotchi
+TARGET = AMT_Assist
 
 CXX = aarch64-linux-gnu-g++
 ifeq ($(shell uname -m), x86_64)
