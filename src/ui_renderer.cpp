@@ -80,47 +80,30 @@ void UiRenderer::drawRect(int x, int y, int w, int h, RGBA color) {
 }
 
 void UiRenderer::drawFace(int cx, int cy) {
-    int eyeWidth = 40;
-    int eyeHeight = isBlinking ? 10 : 50; // Khi chớp mắt, mắt híp lại
-    int eyeSpacing = 80;
-    int eyeY = cy - 40;
-
+    std::string l1 = "   /\\_/\\   ";
+    std::string l2 = "  ( o.o )  ";
+    std::string l3 = "   > ^ <   ";
+    
     if (currentExpression == FaceExpression::THINKING) {
-        // Mắt nhấp nháy, đang suy nghĩ
-        eyeWidth = 30;
-        eyeHeight = 30;
+        l2 = "  ( -.- )  ";
     } else if (currentExpression == FaceExpression::ERROR) {
-        // Mắt chéo
-        eyeWidth = 40;
-        eyeHeight = 10;
+        l2 = "  ( x.x )  ";
+    } else if (currentExpression == FaceExpression::TALKING) {
+        l2 = "  ( o.O )  ";
+    } else if (isBlinking) {
+        l2 = "  ( -.- )  ";
     }
-
-    RGBA eyeColor = (currentExpression == FaceExpression::ERROR) ? COLOR_PINK : COLOR_CYAN;
-
-    // Vẽ mắt trái
-    fillRect(cx - eyeSpacing/2 - eyeWidth, eyeY, eyeWidth, eyeHeight, eyeColor);
-    // Vẽ mắt phải
-    fillRect(cx + eyeSpacing/2, eyeY, eyeWidth, eyeHeight, eyeColor);
-
-    // Vẽ miệng
-    int mouthWidth = 60;
-    int mouthHeight = 15;
-    int mouthY = cy + 40;
-
-    if (currentExpression == FaceExpression::TALKING) {
-        // Miệng to ra khi nói
-        mouthHeight = 30;
-        mouthWidth = 70;
-    } else if (currentExpression == FaceExpression::ERROR) {
-        // Miệng mếu
-        mouthHeight = 10;
-        mouthY += 10;
-    } else if (currentExpression == FaceExpression::THINKING) {
-        // Miệng nhỏ
-        mouthWidth = 30;
-    }
-
-    fillRect(cx - mouthWidth/2, mouthY, mouthWidth, mouthHeight, eyeColor);
+    
+    RGBA color = (currentExpression == FaceExpression::ERROR) ? COLOR_PINK : COLOR_CYAN;
+    
+    int w1 = font->getTextWidth(renderer, l1);
+    font->draw(renderer, cx - w1/2, cy - 40, l1, color);
+    
+    int w2 = font->getTextWidth(renderer, l2);
+    font->draw(renderer, cx - w2/2, cy, l2, color);
+    
+    int w3 = font->getTextWidth(renderer, l3);
+    font->draw(renderer, cx - w3/2, cy + 40, l3, color);
 }
 
 void drawWrappedText(SDL_Renderer* renderer, CustomFont* font, std::string text, int x, int y, int maxW, RGBA color) {
@@ -150,37 +133,48 @@ void drawWrappedText(SDL_Renderer* renderer, CustomFont* font, std::string text,
 }
 
 void UiRenderer::drawTextBoxes(int screenWidth, int screenHeight) {
-    int boxX = 20;
-    int boxW = screenWidth - 40;
+    int boxX = 10;
+    int boxW = screenWidth - 20;
     
     // Khung 1: YOU (User Input)
     int uBoxH = 60;
-    int uBoxY = screenHeight - 200; // Nâng lên cao hơn
+    int uBoxY = screenHeight - 205;
     fillRect(boxX, uBoxY, boxW, uBoxH, COLOR_DIM);
     drawRect(boxX, uBoxY, boxW, uBoxH, COLOR_CYAN);
     
     std::string displayUserStr = "YOU: " + userMessage;
     if (showCursor && cursorTimer < 0.5f) displayUserStr += "_";
-    drawWrappedText(renderer, font, displayUserStr, boxX + 15, uBoxY + 15, boxW - 30, COLOR_CYAN);
+    drawWrappedText(renderer, font, displayUserStr, boxX + 10, uBoxY + 15, boxW - 20, COLOR_CYAN);
 
     // Khung 2: AMT ASSIST (AI Response)
     int aBoxH = 110;
-    int aBoxY = screenHeight - 130;
+    int aBoxY = screenHeight - 140;
     fillRect(boxX, aBoxY, boxW, aBoxH, COLOR_DIM);
     drawRect(boxX, aBoxY, boxW, aBoxH, COLOR_PINK);
     drawRect(boxX-1, aBoxY-1, boxW+2, aBoxH+2, COLOR_PINK);
 
     std::string textToDraw = "AMT: " + aiMessage.substr(0, charactersToShow);
-    drawWrappedText(renderer, font, textToDraw, boxX + 15, aBoxY + 15, boxW - 30, COLOR_WHITE);
+    drawWrappedText(renderer, font, textToDraw, boxX + 10, aBoxY + 15, boxW - 20, COLOR_WHITE);
 }
 
 void UiRenderer::render(int screenWidth, int screenHeight) {
     // Vẽ background
     fillRect(0, 0, screenWidth, screenHeight, COLOR_BG);
 
-    // Vẽ Face ở giữa phía trên (nâng cao lên một chút)
-    drawFace(screenWidth / 2, screenHeight / 2 - 90);
+    // Header
+    std::string header = "[Online] AMT ASSIST [Gemini]";
+    int hw = font->getTextWidth(renderer, header);
+    font->draw(renderer, (screenWidth - hw) / 2, 10, header, COLOR_CYAN);
+    drawRect(10, 45, screenWidth - 20, 2, COLOR_DIM); // Line
 
-    // Vẽ 2 Khung Chat
+    // Avatar
+    drawFace(screenWidth / 2, 120);
+
+    // 2 Khung Chat
     drawTextBoxes(screenWidth, screenHeight);
+    
+    // Footer
+    std::string footer = "[BAN PHIM: Go] [ENTER: Gui] [B/ESC: Thoat]";
+    int fw = font->getTextWidth(renderer, footer);
+    font->draw(renderer, (screenWidth - fw) / 2, screenHeight - 25, footer, {150, 150, 150, 255});
 }
