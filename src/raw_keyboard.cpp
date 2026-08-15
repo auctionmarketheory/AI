@@ -94,34 +94,35 @@ void RawKeyboard::threadLoop() {
                 std::this_thread::sleep_for(std::chrono::seconds(1)); // Đợi nếu chưa cắm phím
                 continue;
             }
-            // Chuyển fd sang chế độ blocking để read không tốn CPU
+            // Đảm bảo ở chế độ NON-BLOCKING để thread có thể thoát mượt mà
             int flags = fcntl(fd, F_GETFL, 0);
-            fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+            fcntl(fd, F_SETFL, flags | O_NONBLOCK);
         }
         
         struct input_event ev;
         int rd = read(fd, &ev, sizeof(ev));
         
-        if (rd < (int)sizeof(ev)) {
-            // Lỗi đọc (có thể do rút cáp)
+        if (rd > 0) {
+            if (ev.type == EV_KEY && ev.value == 1) { // 1 = Key Press
+                std::lock_guard<std::mutex> lock(m_mutex);
+                
+                if (ev.code == KEY_BACKSPACE) {
+                    m_backspacePending = true;
+                } else if (ev.code == KEY_ENTER || ev.code == KEY_KPENTER) {
+                    m_enterPending = true;
+                } else if (ev.code == KEY_ESC) {
+                    m_escPending = true;
+                } else if (KEY_MAP.count(ev.code)) {
+                    m_pendingText += KEY_MAP.at(ev.code);
+                }
+            }
+        } else if (rd < 0 && errno == EAGAIN) {
+            // Hết event trong buffer, ngủ 10ms để không tốn CPU
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        } else {
+            // Lỗi đọc thực sự (do rút cáp)
             close(fd);
             fd = -1;
-            continue;
-        }
-        
-        if (ev.type == EV_KEY && ev.value == 1) { // 1 = Key Press, (2 = Auto Repeat)
-            std::lock_guard<std::mutex> lock(m_mutex);
-            
-            if (ev.code == KEY_BACKSPACE) {
-                m_backspacePending = true;
-            } else if (ev.code == KEY_ENTER || ev.code == KEY_KPENTER) {
-                m_enterPending = true;
-            } else if (ev.code == KEY_ESC) {
-                m_escPending = true;
-            } else if (KEY_MAP.count(ev.code)) {
-                // Tạm thời chỉ hỗ trợ gõ chữ thường, chưa hỗ trợ Shift
-                m_pendingText += KEY_MAP.at(ev.code);
-            }
         }
     }
     

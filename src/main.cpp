@@ -143,6 +143,9 @@ int main(int argc, char* argv[]) {
 
     auto handleActionQuit = [&]() {
         running = false;
+        if (networkThread.joinable()) {
+            networkThread.detach(); // Thoát ngay, không chờ mạng để tránh treo máy
+        }
     };
 
     while (running) {

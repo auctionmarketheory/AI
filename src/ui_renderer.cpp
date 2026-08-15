@@ -110,7 +110,7 @@ void UiRenderer::drawFace(int cx, int cy) {
     fillRect(cx - mouthWidth/2, mouthY, mouthWidth, mouthHeight, eyeColor);
 }
 
-void drawWrappedText(SDL_Renderer* renderer, CustomFont* font, std::string text, int x, int y, int maxW, RGBA color) {
+int drawWrappedText(SDL_Renderer* renderer, CustomFont* font, std::string text, int x, int y, int maxW, RGBA color, bool measureOnly = false) {
     std::string currentLine = "";
     int textX = x;
     int textY = y;
@@ -123,7 +123,7 @@ void drawWrappedText(SDL_Renderer* renderer, CustomFont* font, std::string text,
         std::string word = text.substr(i, nextSpace - i + 1);
         int lineWidth = font->getTextWidth(renderer, currentLine + word);
         if (lineWidth > maxW && currentLine.length() > 0) {
-            font->draw(renderer, textX, textY, currentLine, color);
+            if (!measureOnly) font->draw(renderer, textX, textY, currentLine, color);
             textY += lineHeight;
             currentLine = word;
         } else {
@@ -132,8 +132,10 @@ void drawWrappedText(SDL_Renderer* renderer, CustomFont* font, std::string text,
         i = nextSpace + 1;
     }
     if (currentLine.length() > 0) {
-        font->draw(renderer, textX, textY, currentLine, color);
+        if (!measureOnly) font->draw(renderer, textX, textY, currentLine, color);
+        textY += lineHeight;
     }
+    return textY - y;
 }
 
 void UiRenderer::drawTextBoxes(int screenWidth, int screenHeight) {
@@ -161,10 +163,27 @@ void UiRenderer::drawTextBoxes(int screenWidth, int screenHeight) {
     font->draw(renderer, padding + 10, yUser + 10, "YOU:", COLOR_CYAN);
     drawWrappedText(renderer, font, displayUserStr, padding + 10, yUser + 35, boxW - 20, COLOR_WHITE);
 
-    // AI Box
+    // AI Box (Với tính năng Auto-Scroll Terminal)
     font->draw(renderer, padding + 10, yAI + 10, "AMT ASSIST:", COLOR_PINK);
     std::string textToDraw = aiMessage.substr(0, charactersToShow);
-    drawWrappedText(renderer, font, textToDraw, padding + 10, yAI + 35, boxW - 20, COLOR_WHITE);
+    
+    // Đo chiều cao tổng cộng của đoạn text
+    int totalH = drawWrappedText(renderer, font, textToDraw, padding + 10, yAI + 35, boxW - 20, COLOR_WHITE, true);
+    int startY = yAI + 35;
+    
+    // Nếu chữ dài hơn khung (tính từ startY đến hết hAI), ta đẩy Y lên trên
+    if (totalH > hAI - 45) {
+        startY -= (totalH - (hAI - 45));
+    }
+    
+    // Dùng ClipRect để cắt những phần chữ bị trào ra ngoài AI Box
+    SDL_Rect clipRect = { padding, yAI + 30, boxW, hAI - 35 };
+    SDL_RenderSetClipRect(renderer, &clipRect);
+    
+    drawWrappedText(renderer, font, textToDraw, padding + 10, startY, boxW - 20, COLOR_WHITE);
+    
+    // Tắt ClipRect
+    SDL_RenderSetClipRect(renderer, NULL);
 }
 
 void UiRenderer::render(int screenWidth, int screenHeight) {
@@ -196,11 +215,12 @@ void UiRenderer::render(int screenWidth, int screenHeight) {
     
     // Footer Tiếng Việt Có Dấu
     int yFooter = 220 + 70 + 120 + 10;
-    font->draw(renderer, padding + 10, yFooter, "[BÀN PHÍM CƠ: Gõ chữ trực tiếp]", COLOR_DIM);
+    RGBA COLOR_GRAY = {150, 150, 150, 255};
+    font->draw(renderer, padding + 10, yFooter, "[BÀN PHÍM CƠ: Gõ chữ trực tiếp]", COLOR_GRAY);
     std::string f1r = "[ENTER: Gửi câu]";
-    font->draw(renderer, screenWidth - padding - 10 - font->getTextWidth(renderer, f1r), yFooter, f1r, COLOR_DIM);
+    font->draw(renderer, screenWidth - padding - 10 - font->getTextWidth(renderer, f1r), yFooter, f1r, COLOR_GRAY);
 
-    font->draw(renderer, padding + 10, yFooter + 25, "[D-PAD: Cuộn câu hỏi mẫu]  [A: Xác nhận]", COLOR_DIM);
+    font->draw(renderer, padding + 10, yFooter + 25, "[D-PAD: Cuộn câu hỏi mẫu]  [A: Xác nhận]", COLOR_GRAY);
     std::string f2r = "[B/ESC: Thoát App]";
-    font->draw(renderer, screenWidth - padding - 10 - font->getTextWidth(renderer, f2r), yFooter + 25, f2r, COLOR_DIM);
+    font->draw(renderer, screenWidth - padding - 10 - font->getTextWidth(renderer, f2r), yFooter + 25, f2r, COLOR_GRAY);
 }
