@@ -28,12 +28,12 @@ RawKeyboard::~RawKeyboard() {
     stop();
 }
 
-int RawKeyboard::findKeyboardDevice() {
+std::vector<int> RawKeyboard::findKeyboardDevices() {
+    std::vector<int> fds;
     DIR *dir = opendir("/dev/input");
-    if (!dir) return -1;
+    if (!dir) return fds;
     
     struct dirent *entry;
-    int kbd_fd = -1;
     
     while ((entry = readdir(dir)) != NULL) {
         if (strncmp(entry->d_name, "event", 5) == 0) {
@@ -57,17 +57,19 @@ int RawKeyboard::findKeyboardDevice() {
                     int bitOffsetSpace = KEY_SPACE % (sizeof(unsigned long) * 8);
                     
                     if ((keybit[bitIndexA] & (1UL << bitOffsetA)) && (keybit[bitIndexSpace] & (1UL << bitOffsetSpace))) {
-                        // Đây khả năng cao là Bàn phím thực sự
-                        kbd_fd = fd;
-                        break;
+                        // Lưu toàn bộ các đường truyền (Endpoint) thoả mãn
+                        fds.push_back(fd);
+                    } else {
+                        close(fd);
                     }
+                } else {
+                    close(fd);
                 }
-                close(fd);
             }
         }
     }
     closedir(dir);
-    return kbd_fd;
+    return fds;
 }
 
 void RawKeyboard::start() {
@@ -85,50 +87,58 @@ void RawKeyboard::stop() {
 }
 
 void RawKeyboard::threadLoop() {
-    int fd = -1;
-    
     while (m_running) {
-        if (fd < 0) {
-            fd = findKeyboardDevice();
-            if (fd < 0) {
+        if (m_fds.empty()) {
+            m_fds = findKeyboardDevices();
+            if (m_fds.empty()) {
                 std::this_thread::sleep_for(std::chrono::seconds(1)); // Đợi nếu chưa cắm phím
                 continue;
             }
-            // Đảm bảo ở chế độ NON-BLOCKING để thread có thể thoát mượt mà
-            int flags = fcntl(fd, F_GETFL, 0);
-            fcntl(fd, F_SETFL, flags | O_NONBLOCK);
         }
         
-        struct input_event ev;
-        int rd = read(fd, &ev, sizeof(ev));
+        bool anyEventRead = false;
         
-        if (rd > 0) {
-            if (ev.type == EV_KEY && ev.value == 1) { // 1 = Key Press
-                std::lock_guard<std::mutex> lock(m_mutex);
-                
-                if (ev.code == KEY_BACKSPACE) {
-                    m_backspacePending = true;
-                } else if (ev.code == KEY_ENTER || ev.code == KEY_KPENTER) {
-                    m_enterPending = true;
-                } else if (ev.code == KEY_ESC) {
-                    m_escPending = true;
-                } else if (KEY_MAP.count(ev.code)) {
-                    m_pendingText += KEY_MAP.at(ev.code);
+        for (auto it = m_fds.begin(); it != m_fds.end(); ) {
+            int fd = *it;
+            struct input_event ev;
+            int rd = read(fd, &ev, sizeof(ev));
+            
+            if (rd > 0) {
+                anyEventRead = true;
+                if (ev.type == EV_KEY && ev.value == 1) { // 1 = Key Press
+                    std::lock_guard<std::mutex> lock(m_mutex);
+                    
+                    if (ev.code == KEY_BACKSPACE) {
+                        m_backspacePending = true;
+                    } else if (ev.code == KEY_ENTER || ev.code == KEY_KPENTER) {
+                        m_enterPending = true;
+                    } else if (ev.code == KEY_ESC) {
+                        m_escPending = true;
+                    } else if (KEY_MAP.count(ev.code)) {
+                        m_pendingText += KEY_MAP.at(ev.code);
+                    }
                 }
+                ++it;
+            } else if (rd < 0 && errno == EAGAIN) {
+                // FD này đang rảnh rỗi (Không có lỗi, không có event)
+                ++it;
+            } else {
+                // Thiết bị bị rút hoặc lỗi nghiêm trọng
+                close(fd);
+                it = m_fds.erase(it);
             }
-        } else if (rd < 0 && errno == EAGAIN) {
-            // Hết event trong buffer, ngủ 10ms để không tốn CPU
+        }
+        
+        // Nếu đã quét qua toàn bộ FD mà không có bất kỳ event nào, ta ngủ 10ms để tiết kiệm CPU
+        if (!anyEventRead) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        } else {
-            // Lỗi đọc thực sự (do rút cáp)
-            close(fd);
-            fd = -1;
         }
     }
     
-    if (fd >= 0) {
+    for (int fd : m_fds) {
         close(fd);
     }
+    m_fds.clear();
 }
 
 void RawKeyboard::updateInput(std::string& currentInput, bool& isTyping, bool& enterPressed, bool& escPressed) {

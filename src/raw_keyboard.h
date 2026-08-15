@@ -6,6 +6,7 @@
 #include <atomic>
 #include <mutex>
 #include <map>
+#include <vector>
 
 class RawKeyboard {
 public:
@@ -20,11 +21,13 @@ public:
 
 private:
     void threadLoop();
-    int findKeyboardDevice();
+    std::vector<int> findKeyboardDevices();
 
     std::atomic<bool> m_running;
     std::thread m_thread;
     std::mutex m_mutex;
+    
+    std::vector<int> m_fds;
 
     std::string m_pendingText;
     bool m_backspacePending;
