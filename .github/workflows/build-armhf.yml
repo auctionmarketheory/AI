@@ -1,4 +1,4 @@
-name: Build AI_Tamagotchi ARMHF (R36S A33)
+name: Build AMT_Assist ARMHF (R36S A33)
 
 on: [push, pull_request, workflow_dispatch]
 
@@ -28,8 +28,8 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: App_Tamagotchi_Package
+          name: App_AMT_Assist
           path: |
-            AI_Tamagotchi
+            AMT_Assist
             res/
-            launchers/AI_Tamagotchi.sh
+            launchers/AMT_Assist.sh
