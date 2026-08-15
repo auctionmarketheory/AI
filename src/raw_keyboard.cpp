@@ -47,11 +47,16 @@ int RawKeyboard::findKeyboardDevice() {
                 // Kiểm tra xem device có hỗ trợ sự kiện phím (EV_KEY) không
                 if (bitmask[0] & (1 << EV_KEY)) {
                     // Kiểm tra tiếp xem có hỗ trợ phím A, B, C không (loại trừ power button hoặc gamepad)
-                    unsigned long keybit[KEY_MAX/8 + 1];
+                    unsigned long keybit[KEY_MAX/(sizeof(unsigned long)*8) + 1];
                     memset(keybit, 0, sizeof(keybit));
                     ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keybit)), keybit);
                     
-                    if ((keybit[KEY_A/8] & (1 << (KEY_A%8))) && (keybit[KEY_SPACE/8] & (1 << (KEY_SPACE%8)))) {
+                    int bitIndexA = KEY_A / (sizeof(unsigned long) * 8);
+                    int bitOffsetA = KEY_A % (sizeof(unsigned long) * 8);
+                    int bitIndexSpace = KEY_SPACE / (sizeof(unsigned long) * 8);
+                    int bitOffsetSpace = KEY_SPACE % (sizeof(unsigned long) * 8);
+                    
+                    if ((keybit[bitIndexA] & (1UL << bitOffsetA)) && (keybit[bitIndexSpace] & (1UL << bitOffsetSpace))) {
                         // Đây khả năng cao là Bàn phím thực sự
                         kbd_fd = fd;
                         break;

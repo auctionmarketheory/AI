@@ -201,8 +201,7 @@ int main(int argc, char* argv[]) {
                 ui.setExpression(FaceExpression::TALKING);
             }
             ui.setAiMessage(apiResponse);
-            // Sau khi trả lời xong, clear input để gõ câu mới
-            userInput = "";
+            // Không xóa userInput ngay để người dùng thấy mình đã chọn gì
             ui.setUserMessage(userInput, true);
         }
 

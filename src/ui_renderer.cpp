@@ -80,30 +80,34 @@ void UiRenderer::drawRect(int x, int y, int w, int h, RGBA color) {
 }
 
 void UiRenderer::drawFace(int cx, int cy) {
-    std::string l1 = "   /\\_/\\   ";
-    std::string l2 = "  ( o.o )  ";
-    std::string l3 = "   > ^ <   ";
-    
+    int eyeWidth = 40;
+    int eyeHeight = isBlinking ? 10 : 50;
+    int eyeSpacing = 80;
+    int eyeY = cy - 40;
+
     if (currentExpression == FaceExpression::THINKING) {
-        l2 = "  ( -.- )  ";
+        eyeWidth = 30; eyeHeight = 30;
     } else if (currentExpression == FaceExpression::ERROR) {
-        l2 = "  ( x.x )  ";
-    } else if (currentExpression == FaceExpression::TALKING) {
-        l2 = "  ( o.O )  ";
-    } else if (isBlinking) {
-        l2 = "  ( -.- )  ";
+        eyeWidth = 40; eyeHeight = 10;
     }
-    
-    RGBA color = (currentExpression == FaceExpression::ERROR) ? COLOR_PINK : COLOR_CYAN;
-    
-    int w1 = font->getTextWidth(renderer, l1);
-    font->draw(renderer, cx - w1/2, cy - 40, l1, color);
-    
-    int w2 = font->getTextWidth(renderer, l2);
-    font->draw(renderer, cx - w2/2, cy, l2, color);
-    
-    int w3 = font->getTextWidth(renderer, l3);
-    font->draw(renderer, cx - w3/2, cy + 40, l3, color);
+
+    RGBA eyeColor = (currentExpression == FaceExpression::ERROR) ? COLOR_PINK : COLOR_CYAN;
+
+    fillRect(cx - eyeSpacing/2 - eyeWidth, eyeY, eyeWidth, eyeHeight, eyeColor);
+    fillRect(cx + eyeSpacing/2, eyeY, eyeWidth, eyeHeight, eyeColor);
+
+    int mouthWidth = 60;
+    int mouthHeight = 15;
+    int mouthY = cy + 40;
+
+    if (currentExpression == FaceExpression::TALKING) {
+        mouthHeight = 30; mouthWidth = 70;
+    } else if (currentExpression == FaceExpression::ERROR) {
+        mouthHeight = 10; mouthY += 10;
+    } else if (currentExpression == FaceExpression::THINKING) {
+        mouthWidth = 30;
+    }
+    fillRect(cx - mouthWidth/2, mouthY, mouthWidth, mouthHeight, eyeColor);
 }
 
 void drawWrappedText(SDL_Renderer* renderer, CustomFont* font, std::string text, int x, int y, int maxW, RGBA color) {
@@ -133,48 +137,70 @@ void drawWrappedText(SDL_Renderer* renderer, CustomFont* font, std::string text,
 }
 
 void UiRenderer::drawTextBoxes(int screenWidth, int screenHeight) {
-    int boxX = 10;
-    int boxW = screenWidth - 20;
+    int padding = 15;
+    int boxW = screenWidth - padding * 2;
     
-    // Khung 1: YOU (User Input)
-    int uBoxH = 60;
-    int uBoxY = screenHeight - 205;
-    fillRect(boxX, uBoxY, boxW, uBoxH, COLOR_DIM);
-    drawRect(boxX, uBoxY, boxW, uBoxH, COLOR_CYAN);
-    
-    std::string displayUserStr = "YOU: " + userMessage;
+    // Y offsets
+    int yHeader = 40;
+    int yFaceBottom = 220;
+    int yUser = yFaceBottom;
+    int hUser = 70;
+    int yAI = yUser + hUser;
+    int hAI = 120;
+    int yFooter = yAI + hAI;
+
+    // Vẽ các đường kẻ ngang (Terminal ASCII feel)
+    drawRect(padding, yHeader, boxW, 1, COLOR_DIM);
+    drawRect(padding, yUser, boxW, 1, COLOR_DIM);
+    drawRect(padding, yAI, boxW, 1, COLOR_DIM);
+    drawRect(padding, yFooter, boxW, 1, COLOR_DIM);
+
+    // YOU Box
+    std::string displayUserStr = ">> " + userMessage;
     if (showCursor && cursorTimer < 0.5f) displayUserStr += "_";
-    drawWrappedText(renderer, font, displayUserStr, boxX + 10, uBoxY + 15, boxW - 20, COLOR_CYAN);
+    font->draw(renderer, padding + 10, yUser + 10, "YOU:", COLOR_CYAN);
+    drawWrappedText(renderer, font, displayUserStr, padding + 10, yUser + 35, boxW - 20, COLOR_WHITE);
 
-    // Khung 2: AMT ASSIST (AI Response)
-    int aBoxH = 110;
-    int aBoxY = screenHeight - 140;
-    fillRect(boxX, aBoxY, boxW, aBoxH, COLOR_DIM);
-    drawRect(boxX, aBoxY, boxW, aBoxH, COLOR_PINK);
-    drawRect(boxX-1, aBoxY-1, boxW+2, aBoxH+2, COLOR_PINK);
-
-    std::string textToDraw = "AMT: " + aiMessage.substr(0, charactersToShow);
-    drawWrappedText(renderer, font, textToDraw, boxX + 10, aBoxY + 15, boxW - 20, COLOR_WHITE);
+    // AI Box
+    font->draw(renderer, padding + 10, yAI + 10, "AMT ASSIST:", COLOR_PINK);
+    std::string textToDraw = aiMessage.substr(0, charactersToShow);
+    drawWrappedText(renderer, font, textToDraw, padding + 10, yAI + 35, boxW - 20, COLOR_WHITE);
 }
 
 void UiRenderer::render(int screenWidth, int screenHeight) {
     // Vẽ background
     fillRect(0, 0, screenWidth, screenHeight, COLOR_BG);
 
+    int padding = 15;
+    int boxW = screenWidth - padding * 2;
+    
+    // Khung viền ngoài cùng
+    drawRect(padding, 10, boxW, screenHeight - 20, COLOR_DIM);
+    drawRect(padding-1, 9, boxW+2, screenHeight - 18, COLOR_DIM);
+
     // Header
-    std::string header = "[Online] AMT ASSIST [Gemini]";
+    font->draw(renderer, padding + 10, 15, "[Online]", {255, 200, 0, 255}); // Vàng Cyberpunk
+    std::string header = "AMT ASSIST";
     int hw = font->getTextWidth(renderer, header);
-    font->draw(renderer, (screenWidth - hw) / 2, 10, header, COLOR_CYAN);
-    drawRect(10, 45, screenWidth - 20, 2, COLOR_DIM); // Line
+    font->draw(renderer, (screenWidth - hw) / 2, 15, header, COLOR_CYAN);
+    
+    std::string rightHeader = "[Gemini 3.5]";
+    int rhw = font->getTextWidth(renderer, rightHeader);
+    font->draw(renderer, screenWidth - padding - 10 - rhw, 15, rightHeader, COLOR_PINK);
 
     // Avatar
-    drawFace(screenWidth / 2, 120);
+    drawFace(screenWidth / 2, 130);
 
-    // 2 Khung Chat
+    // 2 Khung Chat & Divider
     drawTextBoxes(screenWidth, screenHeight);
     
-    // Footer
-    std::string footer = "[BAN PHIM: Go] [ENTER: Gui] [B/ESC: Thoat]";
-    int fw = font->getTextWidth(renderer, footer);
-    font->draw(renderer, (screenWidth - fw) / 2, screenHeight - 25, footer, {150, 150, 150, 255});
+    // Footer Tiếng Việt Có Dấu
+    int yFooter = 220 + 70 + 120 + 10;
+    font->draw(renderer, padding + 10, yFooter, "[BÀN PHÍM CƠ: Gõ chữ trực tiếp]", COLOR_DIM);
+    std::string f1r = "[ENTER: Gửi câu]";
+    font->draw(renderer, screenWidth - padding - 10 - font->getTextWidth(renderer, f1r), yFooter, f1r, COLOR_DIM);
+
+    font->draw(renderer, padding + 10, yFooter + 25, "[D-PAD: Cuộn câu hỏi mẫu]  [A: Xác nhận]", COLOR_DIM);
+    std::string f2r = "[B/ESC: Thoát App]";
+    font->draw(renderer, screenWidth - padding - 10 - font->getTextWidth(renderer, f2r), yFooter + 25, f2r, COLOR_DIM);
 }
