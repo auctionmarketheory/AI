@@ -1,8 +1,8 @@
 TARGET = AI_Tamagotchi
 
-CC = aarch64-linux-gnu-g++
+CXX = aarch64-linux-gnu-g++
 ifeq ($(shell uname -m), x86_64)
-	CC = g++
+	CXX = g++
 endif
 
 CFLAGS = -Wall -O3 -Iinclude -Isrc -std=c++11
@@ -17,10 +17,10 @@ OBJS = $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SRCS))
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp | $(OBJ_DIR)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CXX) $(CFLAGS) -c $< -o $@
 
 $(OBJ_DIR):
 	mkdir -p $@
