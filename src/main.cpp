@@ -83,9 +83,13 @@ int main(int argc, char* argv[]) {
 
     bool waitingForNetwork = false;
     std::thread networkThread;
+    
+    Uint32 lastInputTime = 0;
+    const Uint32 DEBOUNCE_MS = 250;
 
     auto handleActionUp = [&]() {
-        if (isFetching) return;
+        if (isFetching || SDL_GetTicks() - lastInputTime < DEBOUNCE_MS) return;
+        lastInputTime = SDL_GetTicks();
         currentPromptIndex--;
         if (currentPromptIndex < 0) currentPromptIndex = prompts.size() - 1;
         ui.setChatMessage(">> " + prompts[currentPromptIndex]);
@@ -93,7 +97,8 @@ int main(int argc, char* argv[]) {
     };
 
     auto handleActionDown = [&]() {
-        if (isFetching) return;
+        if (isFetching || SDL_GetTicks() - lastInputTime < DEBOUNCE_MS) return;
+        lastInputTime = SDL_GetTicks();
         currentPromptIndex++;
         if (currentPromptIndex >= prompts.size()) currentPromptIndex = 0;
         ui.setChatMessage(">> " + prompts[currentPromptIndex]);
@@ -101,7 +106,8 @@ int main(int argc, char* argv[]) {
     };
 
     auto handleActionConfirm = [&]() {
-        if (isFetching) return;
+        if (isFetching || SDL_GetTicks() - lastInputTime < DEBOUNCE_MS) return;
+        lastInputTime = SDL_GetTicks();
         ui.setExpression(FaceExpression::THINKING);
         ui.setChatMessage("Đang kết nối vệ tinh...");
         waitingForNetwork = true;
@@ -141,7 +147,7 @@ int main(int argc, char* argv[]) {
                 static bool axisActive[4] = {false, false, false, false};
                 int axis = e.jaxis.axis;
                 Sint16 val = e.jaxis.value;
-                const Sint16 DEAD = 8000;
+                const Sint16 DEAD = 16000;
                 if (axis == 1) { // Vertical
                     if (val < -DEAD && !axisActive[2]) { handleActionUp(); axisActive[2] = true; }
                     else if (val > DEAD && !axisActive[3]) { handleActionDown(); axisActive[3] = true; }
