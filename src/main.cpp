@@ -25,10 +25,12 @@ void fetchGeminiTask(std::string prompt) {
 #define BTN_B  1
 #define BTN_X  2
 #define BTN_Y  3
-#define BTN_DPAD_UP    8
-#define BTN_DPAD_DOWN  9
-#define BTN_DPAD_LEFT  10
-#define BTN_DPAD_RIGHT 11
+#define BTN_SELECT 8
+#define BTN_START  9
+#define BTN_DPAD_UP    13
+#define BTN_DPAD_DOWN  14
+#define BTN_DPAD_LEFT  15
+#define BTN_DPAD_RIGHT 16
 
 int main(int argc, char* argv[]) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) < 0) {
@@ -39,7 +41,7 @@ int main(int argc, char* argv[]) {
     int screenWidth = 640;
     int screenHeight = 480;
 
-    SDL_Window* window = SDL_CreateWindow("R36S Tamagotchi", 
+    SDL_Window* window = SDL_CreateWindow("Trợ lý AMT", 
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
         screenWidth, screenHeight, SDL_WINDOW_SHOWN);
     
@@ -66,7 +68,7 @@ int main(int argc, char* argv[]) {
 
     UiRenderer ui(renderer, &font);
     ui.setExpression(FaceExpression::IDLE);
-    ui.setChatMessage("Xin chào, tôi là Xiaozhi R36S. Dùng D-PAD để chọn câu hỏi, nhấn nút A để gửi!");
+    ui.setChatMessage("Xin chào, tôi là trợ lý AMT. Dùng D-PAD để chọn câu hỏi, nhấn nút A để gửi!");
 
     bool running = true;
     SDL_Event e;
@@ -81,6 +83,10 @@ int main(int argc, char* argv[]) {
     };
     int currentPromptIndex = 0;
 
+    std::string userInput = "";
+    bool isTypingMode = false;
+    SDL_StartTextInput();
+
     bool waitingForNetwork = false;
     std::thread networkThread;
     
@@ -90,6 +96,7 @@ int main(int argc, char* argv[]) {
     auto handleActionUp = [&]() {
         if (isFetching || SDL_GetTicks() - lastInputTime < DEBOUNCE_MS) return;
         lastInputTime = SDL_GetTicks();
+        isTypingMode = false;
         currentPromptIndex--;
         if (currentPromptIndex < 0) currentPromptIndex = prompts.size() - 1;
         ui.setChatMessage(">> " + prompts[currentPromptIndex]);
@@ -99,6 +106,7 @@ int main(int argc, char* argv[]) {
     auto handleActionDown = [&]() {
         if (isFetching || SDL_GetTicks() - lastInputTime < DEBOUNCE_MS) return;
         lastInputTime = SDL_GetTicks();
+        isTypingMode = false;
         currentPromptIndex++;
         if (currentPromptIndex >= prompts.size()) currentPromptIndex = 0;
         ui.setChatMessage(">> " + prompts[currentPromptIndex]);
@@ -107,6 +115,7 @@ int main(int argc, char* argv[]) {
 
     auto handleActionConfirm = [&]() {
         if (isFetching || SDL_GetTicks() - lastInputTime < DEBOUNCE_MS) return;
+        if (isTypingMode && userInput.empty()) return;
         lastInputTime = SDL_GetTicks();
         ui.setExpression(FaceExpression::THINKING);
         ui.setChatMessage("Đang kết nối vệ tinh...");
@@ -115,7 +124,12 @@ int main(int argc, char* argv[]) {
         if (networkThread.joinable()) {
             networkThread.join();
         }
-        networkThread = std::thread(fetchGeminiTask, prompts[currentPromptIndex] + " (Trả lời ngắn gọn dưới 30 chữ, dùng Tiếng Việt có dấu).");
+        std::string textToSubmit = isTypingMode ? userInput : prompts[currentPromptIndex];
+        if (isTypingMode) {
+            userInput = "";
+            isTypingMode = false;
+        }
+        networkThread = std::thread(fetchGeminiTask, textToSubmit + " (Trả lời ngắn gọn dưới 30 chữ, dùng Tiếng Việt có dấu).");
     };
 
     auto handleActionQuit = [&]() {
@@ -130,30 +144,47 @@ int main(int argc, char* argv[]) {
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) {
                 handleActionQuit();
+            } else if (e.type == SDL_TEXTINPUT) {
+                if (userInput.length() < 200) {
+                    userInput += e.text.text;
+                    isTypingMode = true;
+                    ui.setChatMessage(">> " + userInput + "_");
+                }
             } else if (e.type == SDL_KEYDOWN) {
-                if (e.key.keysym.sym == SDLK_ESCAPE) handleActionQuit();
+                if (e.key.keysym.sym == SDLK_BACKSPACE) {
+                    if (isTypingMode && !userInput.empty()) {
+                        // Xóa 1 byte, loop tiếp nếu là UTF-8 extension byte (10xxxxxx)
+                        do {
+                            userInput.pop_back();
+                        } while (!userInput.empty() && (userInput.back() & 0xC0) == 0x80);
+                        ui.setChatMessage(">> " + userInput + "_");
+                    }
+                }
+                else if (e.key.keysym.sym == SDLK_ESCAPE || e.key.keysym.sym == SDLK_b) handleActionQuit();
                 else if (e.key.keysym.sym == SDLK_UP) handleActionUp();
                 else if (e.key.keysym.sym == SDLK_DOWN) handleActionDown();
-                else if (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_SPACE) handleActionConfirm();
+                else if (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_SPACE || e.key.keysym.sym == SDLK_a) handleActionConfirm();
             } else if (e.type == SDL_JOYBUTTONDOWN) {
                 if (e.jbutton.button == BTN_B) handleActionQuit();
                 else if (e.jbutton.button == BTN_A) handleActionConfirm();
-                else if (e.jbutton.button == BTN_DPAD_UP) handleActionUp();
-                else if (e.jbutton.button == BTN_DPAD_DOWN) handleActionDown();
+                else if (e.jbutton.button == BTN_DPAD_UP || e.jbutton.button == BTN_SELECT) handleActionUp();
+                else if (e.jbutton.button == BTN_DPAD_DOWN || e.jbutton.button == BTN_START) handleActionDown();
             } else if (e.type == SDL_JOYHATMOTION) {
-                if (e.jhat.value == SDL_HAT_UP) handleActionUp();
-                else if (e.jhat.value == SDL_HAT_DOWN) handleActionDown();
+                if (e.jhat.value & SDL_HAT_UP) handleActionUp();
+                else if (e.jhat.value & SDL_HAT_DOWN) handleActionDown();
             } else if (e.type == SDL_JOYAXISMOTION) {
                 static bool axisActive[4] = {false, false, false, false};
                 int axis = e.jaxis.axis;
                 Sint16 val = e.jaxis.value;
                 const Sint16 DEAD = 16000;
-                if (axis == 1) { // Vertical
+                // Axis 1 là Left Stick Vertical, Axis 7 có thể là D-Pad Vertical trên một số Firmware ArkOS
+                if (axis == 1 || axis == 7 || axis == 5) { // Vertical
                     if (val < -DEAD && !axisActive[2]) { handleActionUp(); axisActive[2] = true; }
                     else if (val > DEAD && !axisActive[3]) { handleActionDown(); axisActive[3] = true; }
-                    else if (std::abs(val) <= DEAD) { axisActive[2] = false; axisActive[3] = false; }
+                    else if (abs(val) <= DEAD) { axisActive[2] = false; axisActive[3] = false; }
                 }
             }
+
         }
 
         if (waitingForNetwork && !isFetching) {
