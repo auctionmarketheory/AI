@@ -161,7 +161,20 @@ void UiRenderer::drawTextBoxes(int screenWidth, int screenHeight) {
     std::string displayUserStr = ">> " + userMessage;
     if (showCursor && cursorTimer < 0.5f) displayUserStr += "_";
     font->draw(renderer, padding + 10, yUser + 10, "YOU:", COLOR_CYAN);
-    drawWrappedText(renderer, font, displayUserStr, padding + 10, yUser + 35, boxW - 20, COLOR_WHITE);
+    
+    int totalHUser = drawWrappedText(renderer, font, displayUserStr, padding + 10, yUser + 35, boxW - 20, COLOR_WHITE, true);
+    int startYUser = yUser + 35;
+    
+    if (totalHUser > hUser - 40) {
+        startYUser -= (totalHUser - (hUser - 40));
+    }
+    
+    SDL_Rect clipRectUser = { padding, yUser + 30, boxW, hUser - 35 };
+    SDL_RenderSetClipRect(renderer, &clipRectUser);
+    
+    drawWrappedText(renderer, font, displayUserStr, padding + 10, startYUser, boxW - 20, COLOR_WHITE);
+    
+    SDL_RenderSetClipRect(renderer, NULL);
 
     // AI Box (Với tính năng Auto-Scroll Terminal)
     font->draw(renderer, padding + 10, yAI + 10, "AMT ASSIST:", COLOR_PINK);
